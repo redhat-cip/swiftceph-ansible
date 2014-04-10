@@ -1,0 +1,27 @@
+---
+# Variables for the HAproxy configuration
+
+# HAProxy supports "http" and "tcp". For SSL, SMTP, etc, use "tcp".
+mode: http
+
+# Port on which HAProxy should listen
+listenport: 8080
+
+httpd_port: 8080
+
+# A name for the proxy daemon, this wil be the suffix in the logs.
+daemonname: swift-proxy
+
+# Balancing Algorithm. Available options:
+# roundrobin, source, leastconn, source, uri
+# (if persistance is required use, "source")
+balance: source
+
+# Ethernet interface on which the load balancer should listen
+# Defaults to the first interface. Change this to:
+#
+#  iface: eth1
+#
+# ...to override.
+#
+iface: eth1

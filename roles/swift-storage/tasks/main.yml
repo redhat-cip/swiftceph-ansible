@@ -1,0 +1,65 @@
+---
+
+- name: Copy Swift key
+  copy: src=fetch/{{ fsid }}/etc/ceph/ceph.client.{{ swift_ceph_user }}.keyring  dest=/etc/ceph/ceph.client.{{ swift_ceph_user }}.keyring owner=swift group=swift mode=600
+  when: swift_ceph
+
+- name: create run dir
+  file: name={{ item }} state=directory owner=swift group=swift
+  with_items:
+    - /var/run/swift
+    - /var/cache/swift
+
+- name: make sure /srv/1/node exists
+  file: path=/srv/1/node/ state=directory owner=swift group=swift mode=0770 recurse=true
+
+- name: make sure /var/swift/recon exists
+  file: path=/var/swift/recon state=directory owner=swift group=swift mode=0750
+
+#
+# Configure rsync
+#
+
+- name: copy over rsyncd.conf to swift storage
+  template: src=rsyncd.conf.j2 dest=/etc/rsyncd.conf
+
+- name: edit /etc/sysconfig/rsync
+  lineinfile: dest=/etc/default/rsync regexp=^RSYNC_ENABLE line="RSYNC_ENABLE=true"
+
+- name: edit /etc/sysconfig/rsync
+  lineinfile: dest=/etc/default/rsync regexp=^RSYNC_OPTS line="RSYNC_OPTS='--address {{ hostvars[inventory_hostname]['ansible_' + iface].ipv4.address }}'"
+
+- name: make sure rsync is running
+  service: name=rsync state=started
+
+#
+# Configure swift storage processes
+#
+
+- name: ensure *-server directories exist in /etc/swift
+  file: path=/etc/swift/{{ item }}-server state=directory owner=swift group=swift mode=0755
+  with_items:
+    - account
+    - container
+    - object
+
+- name: put the *.ring.gz files on all storage servers
+  copy: src=fetch/{{ item }}.ring.gz dest=/etc/swift/{{ item }}.ring.gz owner=swift group=swift mode=0640
+  with_items:
+    - account
+    - object
+    - container
+
+- name: copy over *-server.conf files
+  template: src={{ item }}-server.conf.j2 dest=/etc/swift/{{ item }}-server/{{ item }}-server.conf owner=swift group=swift mode=0644
+  with_items:
+    - account
+    - container
+    - object
+  notify: restart all
+
+- name: ensure swift owner
+  file: name=/etc/swift owner=swift group=swift recurse=yes
+
+- name: start object daemons
+  command: swift-init all start

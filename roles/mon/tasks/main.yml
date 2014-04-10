@@ -1,0 +1,50 @@
+---
+## Deploy Ceph monitor(s)
+#
+
+- name: Create monitor initial keyring
+  command: ceph-authtool /var/lib/ceph/tmp/keyring.mon.{{ ansible_hostname }} --create-keyring --name=mon. --add-key={{ monitor_secret }} --cap mon 'allow *' creates=/var/lib/ceph/tmp/keyring.mon.{{ ansible_hostname }}
+
+- name: Set initial monitor key permissions
+  file: path=/var/lib/ceph/tmp/keyring.mon.{{ ansible_hostname }} mode=0600 owner=root group=root
+
+- name: Create monitor directory
+  file: path=/var/lib/ceph/mon/ceph-{{ ansible_hostname }} state=directory owner=root group=root mode=0644
+
+- name: Ceph monitor mkfs
+  command: ceph-mon --mkfs -i {{ ansible_hostname }} --keyring /var/lib/ceph/tmp/keyring.mon.{{ ansible_hostname }} creates=/var/lib/ceph/mon/ceph-{{ ansible_hostname }}/keyring
+
+- name: Start and add that the monitor service to the init sequence
+  service: name=ceph state=started enabled=yes args=mon
+
+# Wait for mon discovery and quorum resolution
+# the admin key is not instantanely created so we have to wait a bit
+#
+
+- name: If client.admin key exists
+  command: stat /etc/ceph/ceph.client.admin.keyring
+  register: result
+  until: result.rc == 0
+  changed_when: False
+
+- name: Create Swift pool
+  command: ceph osd pool create {{ swift_ceph_pool }} {{ pool_default_pg_num }} {{ pool_default_pgp_num }}
+  changed_when: False
+  when: cephx and swift_ceph
+
+- name: Create Swift keyring
+  command: ceph auth get-or-create client.{{ swift_ceph_user }} osd 'allow rwx pool={{ swift_ceph_pool }}' mon 'allow rw' -o /etc/ceph/ceph.client.{{ swift_ceph_user }}.keyring creates=/etc/ceph/ceph.client.{{ swift_ceph_user }}.keyring
+  when: cephx and swift_ceph
+  changed_when: False
+
+- name: Copy keys to the ansible server
+  fetch: src={{ item }} dest=fetch/{{ fsid }}/{{ item }} flat=yes
+  when: cephx
+  with_items:
+    - /etc/ceph/ceph.client.admin.keyring # just in case another application needs it
+    - /var/lib/ceph/bootstrap-osd/ceph.keyring # this handles the non-colocation case
+    - /etc/ceph/ceph.client.{{ swift_ceph_user }}.keyring
+
+- name: Drop in a motd script to report status when logging in
+  copy: src=precise/92-ceph dest=/etc/update-motd.d/92-ceph owner=root group=root mode=0755
+  when: ansible_distribution_release == 'precise'

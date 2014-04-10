@@ -1,0 +1,19 @@
+---
+# Defines deployment design and assigns role to server groups
+
+- hosts: all
+  sudo: True
+  roles:
+  - common
+
+- hosts: proxies
+  sudo: True
+  roles:
+  - mon
+  - swift-proxy
+
+- hosts: storages
+  sudo: True
+  roles:
+  - osd
+  - swift-storage

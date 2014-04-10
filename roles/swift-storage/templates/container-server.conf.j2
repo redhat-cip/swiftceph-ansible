@@ -1,0 +1,20 @@
+[DEFAULT]
+devices = /srv/1/node
+mount_check = false
+disable_fallocate = true
+bind_ip = {{ hostvars[ansible_hostname]['ansible_' + iface].ipv4.address }}
+workers = 2
+
+[pipeline:main]
+pipeline = container-server
+
+[app:container-server]
+use = egg:swift#container
+
+[container-replicator]
+
+[container-updater]
+
+[container-auditor]
+
+[container-sync]

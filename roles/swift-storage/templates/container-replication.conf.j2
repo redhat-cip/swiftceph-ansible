@@ -1,0 +1,19 @@
+[DEFAULT]
+devices = /srv/node
+bind_ip = {{ hostvars[ansible_hostname]['ansible_' + iface].ipv4.address }}
+workers = 2
+
+[pipeline:main]
+pipeline = container-server
+
+[app:container-server]
+use = egg:swift#container
+replication_server = True
+
+[container-replicator]
+
+[container-updater]
+
+[container-auditor]
+
+[container-sync]

@@ -1,0 +1,5 @@
+.vagrant
+*.vdi
+*.keyring
+*.gz
+fetch/4a158d27-f750-41d5-9e7f-26ce4c9d2d45

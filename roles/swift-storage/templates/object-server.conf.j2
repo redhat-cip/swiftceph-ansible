@@ -1,0 +1,28 @@
+[DEFAULT]
+devices = /srv/1/node
+mount_check = false
+disable_fallocate = true
+bind_port = 6000
+workers = 2
+user = swift
+log_facility = LOG_LOCAL2
+recon_cache_path = /var/cache/swift
+eventlet_debug = true
+rados_ceph_conf= {{ ceph_conf_file }}
+rados_user= {{ swift_ceph_user }}
+rados_pool= {{ swift_ceph_pool }}
+
+[pipeline:main]
+pipeline = recon object-server
+
+[app:object-server]
+use = egg:swift#rados_object
+
+[filter:recon]
+use = egg:swift#recon
+
+[object-updater]
+
+[object-auditor]
+
+[object-replicator]

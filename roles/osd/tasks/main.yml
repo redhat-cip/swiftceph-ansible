@@ -1,0 +1,12 @@
+---
+## Deploy Ceph Oject Storage Daemon(s)
+#
+
+- include: journal_collocation.yml
+  when: journal_collocation
+
+- include: raw_journal.yml
+  when: raw_journal
+
+- include: raw_multi_journal.yml
+  when: raw_multi_journal

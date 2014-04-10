@@ -1,0 +1,71 @@
+---
+
+- name: tell memcached what IP to listen on
+  lineinfile: dest=/etc/memcached.conf regexp="^-l" line='-l {{ hostvars[inventory_hostname]['ansible_' + iface].ipv4.address }}'
+  notify: restart memcached
+
+- name: make sure memcached is running
+  service: name=memcached state=running
+
+- name: create proxy-server.conf
+  template: src=proxy-server.conf.j2 dest=/etc/swift/proxy-server.conf owner=swift group=swift
+
+- name: create rings
+  command: swift-ring-builder {{ item }}.builder create {{ partition_power }} {{ replicas }} {{ min_part_hours }}
+           chdir=/etc/swift
+           creates=/etc/swift/{{ item }}.builder
+  with_items:
+    - account
+    - container
+    - object
+
+- name: build account ring
+  command: swift-ring-builder account.builder add z1-{{ hostvars[item]['ansible_' + iface].ipv4.address }}:6002/sdb1 100
+           chdir=/etc/swift
+  with_items: groups.storages
+  register: accountring
+  ignore_errors: true
+
+- name: build container ring
+  command: swift-ring-builder container.builder add z1-{{ hostvars[item]['ansible_' + iface].ipv4.address }}:6001/sdb1 100
+           chdir=/etc/swift
+  with_items: groups.storages
+  register: containerring
+  ignore_errors: true
+
+- name: build object ring
+  command: swift-ring-builder object.builder add z1-{{ hostvars[item]['ansible_' + iface].ipv4.address }}:6000/sdb1 100
+           chdir=/etc/swift
+  with_items: groups.storages
+  register: objectring
+  ignore_errors: true
+
+# TODO (leseb): try to build the ring in one step
+#    - { service: 'account', port: '6002' }
+#    - { service: 'container', port: '6001' }
+#    - { service: 'object', port: '6000' }
+
+- name: rebalance rings
+  command: swift-ring-builder {{ item }}.builder rebalance
+           chdir=/etc/swift
+          # creates=/etc/swift/{{ item }}.ring.gz
+  with_items:
+    - account
+    - container
+    - object
+  when: accountring.changed and containerring.changed and objectring.changed
+  ignore_errors: true
+
+
+- name: grab resulting *.ring.gz files and put them on all proxy and storage nodes
+  fetch: dest=fetch/{{ item }}.ring.gz flat=yes src=/etc/swift/{{ item }}.ring.gz
+  with_items:
+    - account
+    - object
+    - container
+
+- name: ensure swift owner
+  file: name=/etc/swift owner=swift group=swift recurse=yes state=directory
+
+- name: start swift proxy
+  command: swift-init proxy start
