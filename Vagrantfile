@@ -27,8 +27,7 @@ ansible_provision = Proc.new do |ansible|
 end
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
-  config.vm.box = "ubuntu-14.04.1"
-  config.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/trusty/current/trusty-server-cloudimg-i386-vagrant-disk1.box"
+  config.vm.box = "ubuntu/trusty64"
 
   config.vm.define :swiftcephproxy do |swiftcephproxy|
     swiftcephproxy.vm.network :private_network, ip: "192.168.10.199"
